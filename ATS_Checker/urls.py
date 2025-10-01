@@ -16,7 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-
+from resume_checker.views import JobDescriptionAPI
 urlpatterns = [
+    path('api/jobs/',JobDescriptionAPI.as_view()),
     path('admin/', admin.site.urls),
 ]

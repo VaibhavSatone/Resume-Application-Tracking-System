@@ -37,7 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'resume_checker'
+    'resume_checker',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
