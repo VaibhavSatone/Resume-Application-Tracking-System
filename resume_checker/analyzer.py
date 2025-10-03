@@ -1,6 +1,9 @@
 import pdfplumber
 import spacy
 from .APIKeyFile import Api_key
+from groq import Groq
+import json
+
 
 def extract_text_from_pdf(pdf_path):
     text=""
@@ -9,10 +12,10 @@ def extract_text_from_pdf(pdf_path):
             text+=page.extract_text()+"\n"
     return text.strip()
 
-def analyze_resume_with_llm(resume_text:str,job_decription:str)->dict:
+
+def analyze_resume_with_llm(resume_text: str, job_description: str) -> dict:
     prompt = f"""
-        You are an AI-powered Applicant Tracking System (ATS). 
-        Your job is to carefully evaluate resumes against a given job description.
+        You are an ATS (Applicant Tracking System). Evaluate the following resume against the job description.
 
         ### Job Description:
         {job_description}
@@ -20,21 +23,46 @@ def analyze_resume_with_llm(resume_text:str,job_decription:str)->dict:
         ### Resume:
         {resume_text}
 
-        ### Instructions:
-        1. Compare the resume with the job description.
-        2. Score the resume from 0 to 100, based on overall relevance.
-        3. Extract key information from the resume:
-        - Relevant skills that match the job description
-        - Years of professional experience (approximate if not exact)
-        - Relevant academic or personal projects
-        4. Focus only on **job-related information** (ignore unrelated details).
-        5. Output must be **valid JSON only**, with no explanations.
+        ### Rules:
+        1. Extract skills **only from the 'Skills Summary' section** of the resume. 
+        - Ignore technologies mentioned in project descriptions unless they also appear in the Skills Summary.
+        2. Extract years of professional experience (approximate if not exact).
+        3. Extract only project names from the 'Projects' section.
+        4. Return output strictly as valid JSON with these keys:
+        - rank (integer 0-100)
+        - skills (list of strings)
+        - experience (float in years)
+        - projects (list of project names)
 
-        ### Expected JSON format:
+        ### Example Output:
         {{
-        "rank": <integer between 0-100>,
-        "skills": ["skill1", "skill2", "skill3"],
-        "experience": <integer in years>,
-        "projects": ["project1", "project2"]
+        "rank": 85,
+        "skills": ["Python", "C++", "SQL", "Java", "Dart", "Flutter", "Django"],
+        "experience": 1,
+        "projects": ["Crime Reporting App", "Task Management App", "Hotel Booking System"]
         }}
         """
+
+
+    try:
+        client = Groq(api_key=Api_key)
+        response = client.chat.completions.create(
+            model="deepseek-r1-distill-llama-70b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6,
+            response_format={"type": "json_object"}
+        )
+        result = response.choices[0].message.content
+        return json.loads(result)
+    except Exception as e:
+        print(e)
+        return {"rank": 0, "skills": [], "experience": 0, "projects": []}
+
+def process_resume(pdf_path,job_description):
+    try:    
+        pdf_text=extract_text_from_pdf(pdf_path)
+        result=analyze_resume_with_llm(pdf_text,job_description)
+        return result
+    except Exception as e:
+        print(e)
+        return None
