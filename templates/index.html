@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ATS Resume Checker</title>
+  <style>
+    body {
+      background-color: #d6d16eff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+    .container {
+      
+      background: white;
+      padding: 25px 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      width: 420px;
+    }
+    select, input[type="file"], button {
+      width: 105%;
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+    input[type="file"], button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    button:hover:not(:disabled) {
+      background: #45a049;
+    }
+    button:disabled {
+      background: #a5d6a7;
+      cursor: not-allowed;
+    }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 15px;
+      height: 15px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .result-card {
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-top: 20px;
+      width: 400px;
+      text-align: left;
+    }
+    .rank {
+      font-size: 32px;
+      color: #4CAF50;
+      font-weight: bold;
+      text-align: center;
+    }
+    .section-title {
+      font-weight: bold;
+      margin-top: 15px;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    .skills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .skill-tag {
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 5px 10px;
+      border-radius: 15px;
+      font-size: 13px;
+    }
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+    .loading {
+      text-align: center;
+      font-style: italic;
+      color: gray;
+    }
+  </style>
+</head>
+<body >
+  <div class="container">
+    <h2 style="text-align:center;">ATS Resume Checker</h2>
+
+    <form id="resumeForm" method="POST" enctype="multipart/form-data">
+      {% csrf_token %}
+      <select id="jobSelect" name="job_description" >
+        <option value="">Select Job Description</option>
+      </select>
+
+      <input type="file" id="resumeFile" name="resume" accept=".pdf" >
+      <button type="submit" id="submitBtn">Analyze Resume</button>
+    </form>
+
+    <div id="responseBox">
+      <p id="loadingMsg" class="loading"></p>
+    </div>
+  </div>
+
+  <script>
+    async function loadJobs() {
+      const response = await fetch('/api/jobs/');
+      const data = await response.json();
+      const jobSelect = document.getElementById('jobSelect');
+      if (data.status && data.data) {
+        data.data.forEach(job => {
+          const option = document.createElement('option');
+          option.value = job.id;
+          option.textContent = job.job_title;
+          jobSelect.appendChild(option);
+        });
+      }
+    }
+
+    function getCSRFToken() {
+      return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+
+    document.getElementById('resumeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const jobId = document.getElementById('jobSelect').value;
+      const resume = document.getElementById('resumeFile').files[0];
+      const responseBox = document.getElementById('responseBox');
+      const loadingMsg = document.getElementById('loadingMsg');
+      const submitBtn = document.getElementById('submitBtn');
+
+      responseBox.innerHTML = "";
+      loadingMsg.textContent = "Analyzing your resume... Please wait.";
+
+      if (!jobId || !resume) {
+        loadingMsg.textContent = "Please select a job and upload a resume.";
+        return;
+      }
+
+      // Show spinner on button
+      submitBtn.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.innerHTML = '<span class="spinner"></span>Analyzing...';
+
+      const formData = new FormData();
+      formData.append('job_description', jobId);
+      formData.append('resume', resume);
+
+      // Simulate buffering for 2-3 seconds (for UX feedback)
+      await new Promise(resolve => setTimeout(resolve, 2500));
+
+      const res = await fetch('/api/resume/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCSRFToken(),
+        },
+        body: formData
+      });
+
+      const json = await res.json();
+
+      // Restore button
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+      loadingMsg.textContent = "";
+
+      if (json.status && json.data) {
+        const { rank, skills, experience, projects } = json.data;
+
+        responseBox.innerHTML = `
+          <div class="result-card">
+            <div class="rank">Score: ${rank}/100</div>
+            <div class="section-title">Experience:</div>
+            <p>${experience} years</p>
+
+            <div class="section-title">Skills:</div>
+            <div class="skills">
+              ${skills.map(skill => `<span class="skill-tag">${skill}</span>`).join('')}
+            </div>
+
+            <div class="section-title">Projects:</div>
+            <ul>
+              ${projects.map(p => `<li>${p}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      } else {
+        responseBox.innerHTML = `<p style="color:red;">Error: ${json.message || 'Something went wrong.'}</p>`;
+      }
+    });
+
+    loadJobs();
+  </script>
+</body>
+</html>

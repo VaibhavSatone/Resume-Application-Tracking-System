@@ -38,3 +38,7 @@ class AnalyzeResumeAPI(APIView):
                                  'data':result}) 
         except Exception as e:
             return Response({'data':False})
+
+
+def home(request):
+    return render(request, 'index.html')
