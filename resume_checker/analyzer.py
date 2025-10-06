@@ -26,7 +26,7 @@ def analyze_resume_with_llm(resume_text: str, job_description: str) -> dict:
         ### Rules:
         1. Extract skills **only from the 'Skills Summary' section** of the resume. 
         - Ignore technologies mentioned in project descriptions unless they also appear in the Skills Summary.
-        2. Extract years of professional experience (approximate if not exact).
+        2. Extract years of professional experience (approximate if not exact and show 0 if there is no experience section in resume).
         3. Extract only project names from the 'Projects' section.
         4. Return output strictly as valid JSON with these keys:
         - rank (integer 0-100)
